@@ -6,35 +6,51 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- O "N" Estilizado e Poderoso -->
+    <!-- O "N" Refinado e Equilibrado (Inspirado na sua Referência) -->
     <path
-        android:pathData="M30,30 L45,30 L65,65 L65,30 L78,30 L78,78 L63,78 L43,43 L43,78 L30,78 Z"
-        android:strokeWidth="1"
-        android:strokeColor="#A78BFA">
+        android:pathData="M38,38 L48,38 L60,60 L60,38 L70,38 L70,70 L60,70 L48,48 L48,70 L38,70 Z"
+        android:strokeWidth="0.5"
+        android:strokeColor="#D8B4FE">
         <aapt:attr name="android:fillColor">
             <gradient
-                android:startX="30"
-                android:startY="30"
-                android:endX="78"
-                android:endY="78"
+                android:startX="38"
+                android:startY="38"
+                android:endX="70"
+                android:endY="70"
                 android:type="linear">
-                <item android:offset="0" android:color="#7C3AED" />
-                <item android:offset="1" android:color="#A78BFA" />
+                <item android:offset="0" android:color="#A855F7" />
+                <item android:offset="1" android:color="#7C3AED" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- Brilho/Efeito de Destruição em volta do N -->
+    <!-- Linhas de Energia/Brilho Estilizadas (45 graus) -->
     <path
-        android:pathData="M25,25 L35,35 M73,73 L83,83 M73,35 L83,25 M25,83 L35,73"
+        android:pathData="M28,28 L36,36 M72,72 L80,80 M72,36 L80,28 M28,80 L36,72"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeColor="#A855F7" />
+
+    <!-- Partículas e Pontos de Luz Orbitais -->
+    <path
+        android:pathData="M54,24 L54,28 M84,54 L80,54 M54,84 L54,80 M24,54 L28,54"
         android:strokeWidth="2"
         android:strokeLineCap="round"
-        android:strokeColor="#7C3AED" />
+        android:strokeColor="#D8B4FE" />
 
-    <!-- Partículas de "estilhaço" -->
-    <path
-        android:pathData="M54,20 L56,22 M88,54 L90,56 M54,88 L52,90 M20,54 L18,52"
-        android:strokeWidth="1.5"
-        android:strokeLineCap="round"
-        android:strokeColor="#A78BFA" />
+    <circle
+        android:cx="42"
+        android:cy="28"
+        android:r="1.2"
+        android:fillColor="#D8B4FE" />
+    <circle
+        android:cx="66"
+        android:cy="80"
+        android:r="1.2"
+        android:fillColor="#D8B4FE" />
+    <circle
+        android:cx="82"
+        android:cy="42"
+        android:r="1"
+        android:fillColor="#A855F7" />
 </vector>
