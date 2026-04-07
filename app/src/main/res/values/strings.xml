@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Nex</string>
+    <string name="accessibility_description">Permite ao Nex analisar o conteúdo do ecrã para fornecer assistência contextual.</string>
+</resources>
