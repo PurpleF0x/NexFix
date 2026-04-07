@@ -18,7 +18,8 @@ if (!$geminiApiKey) {
     exit;
 }
 
-define('GEMINI_URL', "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . $geminiApiKey);
+// Alteração na linha 21 do seu api.php
+define('GEMINI_URL', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=" . $geminiApiKey);
 
 // ── FUNÇÃO PARA HISTÓRICO DO GITHUB ──
 function getLatestUpdates($repo, $token = null) {
