@@ -108,8 +108,12 @@ class NexService : Service(), TextToSpeech.OnInitListener {
             override fun onError(error: Int) {
                 isListening = false
                 isWaitingForCommand = false
-                // Aumentamos o delay em caso de erro para evitar loops de 429
-                val delay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 3000L else 1500L
+                // Aumentamos drasticamente o delay em caso de erro para poupar a API (429)
+                val delay = when (error) {
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 5000L
+                    SpeechRecognizer.ERROR_NO_MATCH -> 2000L
+                    else -> 3000L
+                }
                 handler.postDelayed({ startListening() }, delay)
             }
 
