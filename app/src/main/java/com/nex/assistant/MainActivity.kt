@@ -149,7 +149,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val contextObj = JSONObject().apply {
             put("time", sdf.format(Date()))
             put("battery_level", level)
-            put("screen_content", NexAccessibilityService.lastScreenContent?.take(500) ?: "") // Limita tamanho do contexto
+            put("screen_content", NexAccessibilityService.lastScreenContent.take(500)) 
         }
 
         conversationHistory.put(JSONObject().apply { put("role", "user"); put("content", userText) })
@@ -286,6 +286,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         )
                     ),
                     style = Stroke(width = 45f)
+                )
+            }
+
+            // 2.1 Camada Interna (Poeira Estelar com rotação inversa)
+            Canvas(modifier = Modifier.size(190.dp).rotate(rotationDust).blur(1.dp)) {
+                drawCircle(
+                    brush = Brush.sweepGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.White.copy(alpha = 0.2f),
+                            NexPurpleLight.copy(alpha = 0.4f),
+                            Color.Transparent
+                        )
+                    ),
+                    style = Stroke(width = 10f)
                 )
             }
 
