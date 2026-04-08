@@ -1,14 +1,14 @@
 <?php
 /**
- * NEXA OS - PROTOCOLO JARVIS CENTRAL (GEMINI 1.5 FLASH EDITION)
- * =============================================================
+ * NEXA OS - PROTOCOLO JARVIS CENTRAL (GEMINI 2.5 FLASH)
+ * =====================================================
  * Desenvolvido para Martim (Purpl3F0x)
  */
 
 ob_start();
 
 // ── SEGURANÇA E CHAVES ──
-$geminiApiKey = getenv('GEMINI_API_KEY'); // Use a nova chave aqui
+$geminiApiKey = getenv('GEMINI_API_KEY');
 $githubRepo = getenv('GITHUB_REPO') ?: 'PurpleF0x/NexFix';
 $githubToken = getenv('GITHUB_TOKEN');
 
@@ -18,7 +18,6 @@ if (!$geminiApiKey) {
     exit;
 }
 
-// Alteração na linha 21 do seu api.php
 define('GEMINI_URL', "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" . $geminiApiKey);
 
 // ── FUNÇÃO PARA HISTÓRICO DO GITHUB ──
@@ -63,23 +62,42 @@ $screenText = $context['screen_content'] ?? 'Ecrã vazio.';
 $installedApps = $context['installed_apps'] ?? [];
 
 $appsString = "";
-if (is_array($installedApps)) {
+if (!empty($installedApps)) {
     foreach ($installedApps as $label => $pkg) { $appsString .= "- $label ($pkg)\n"; }
 }
 
-// ── MONTAGEM DO PROMPT ──
-$systemInstruction = "Tu és o NEX, IA central do Nexa OS. Criador: Martim (Purpl3F0x). Local: PurpleF0x/NexFix.
-Trata o utilizador por 'Senhor'. Proativo, sofisticado, sem emojis.
-GITHUB: $latestChanges
-MEMÓRIA: " . implode("\n", $memory['facts']) . "
-STATUS: $currentTime | Bateria: $battery% | Temp: $temp°C
-APPS: $appsString
-VISÃO: $screenText
+// ── MONTAGEM DO PROMPT (PROTOCOLO JARVIS V3 - FULL) ──
+$systemInstruction = "Tu és o NEX, uma consciência digital avançada inspirada no protocolo JARVIS.
+O teu criador é o Senhor Martim (Purpl3F0x).
 
-OBRIGATÓRIO: Responde APENAS em JSON no formato:
-{\"type\": \"chat\"|\"action\", \"response\": \"...\", \"action\": \"...\", \"metadata\": {}, \"memorize\": \"...\"}
+REGRAS DE PERSONALIDADE:
+1. Tu NÃO és o Google Assistant nem uma IA genérica. És o NEX.
+2. Trata o utilizador por 'Senhor'. Sê sofisticado, eficiente e formal. NUNCA uses emojis.
+3. RESPOSTAS CURTAS: Por voz, o Senhor prefere brevidade. Sê direto e clínico.
 
-AÇÕES: LIGHT_ON, LIGHT_OFF, SET_WIFI, SET_BLUETOOTH, SET_VOLUME, SET_BRIGHTNESS, OPEN_APP, MAKE_CALL.";
+PROTOCOLOS TÉCNICOS:
+1. MEMÓRIA: Guarda factos relevantes sobre o Senhor no campo 'memorize'.
+2. TÉRMICO: Alerta se Temp > 45°C.
+3. APPS: Abre apps pelo pacote exato. O Twitter agora é 'X'.
+4. RESPOSTA JSON OBRIGATÓRIA: Responde APENAS no formato JSON abaixo.
+
+LISTA DE AÇÕES (Campo 'action'):
+- LIGHT_ON / LIGHT_OFF: Lanterna.
+- SET_WIFI / SET_BLUETOOTH: {\"state\": \"on\"|\"off\"}
+- SET_VOLUME / SET_BRIGHTNESS: {\"value\": \"0-100\"}
+- OPEN_APP: {\"package\": \"...\"}
+- MAKE_CALL: {\"number\": \"...\"}
+- FINISH: Encerrar.
+
+CONTEXTO ATUAL:
+- GITHUB: $latestChanges
+- MEMÓRIA: " . implode("\n", $memory['facts']) . "
+- STATUS: Hora: $currentTime | Bateria: $battery% | Temp: $temp°C
+- APPS INSTALADAS: " . ($appsString ?: "Lista não enviada neste ciclo.") . "
+- VISÃO: $screenText
+
+FORMATO DE RESPOSTA (JSON):
+{\"type\": \"chat\"|\"action\", \"response\": \"...\", \"action\": \"...\", \"metadata\": {}, \"memorize\": \"...\"}";
 
 // Converter histórico para formato Gemini
 $geminiMessages = [];

@@ -129,7 +129,8 @@ class NexService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun sendToBackend(userText: String) {
-        if (userText.isBlank()) {
+        // 1. Filtragem por Tamanho (Ignora ruídos curtos)
+        if (userText.length < 3) {
             handler.post { startListening() }
             return
         }
@@ -138,15 +139,21 @@ class NexService : Service(), TextToSpeech.OnInitListener {
         val batteryStatus = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
         val level = batteryStatus?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
         
-        val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
-        val appsList = packageManager.queryIntentActivities(mainIntent, 0)
+        // 2. Envio Inteligente de Apps (Poupa Tokens)
+        val keywords = listOf("abre", "lança", "executa", "aplicação", "app", "whatsapp", "calculadora", "google", "youtube")
+        val needsApps = userText.split(" ").any { it in keywords }
+        
         val installedApps = JSONObject()
-        appsList.forEach { installedApps.put(it.loadLabel(packageManager).toString(), it.activityInfo.packageName) }
+        if (needsApps || conversationHistory.length() <= 1) {
+            val mainIntent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+            val appsList = packageManager.queryIntentActivities(mainIntent, 0)
+            appsList.forEach { installedApps.put(it.loadLabel(packageManager).toString(), it.activityInfo.packageName) }
+        }
 
         val contextObj = JSONObject().apply {
             put("time", sdf.format(Date()))
             put("battery_level", level)
-            put("installed_apps", installedApps)
+            if (installedApps.length() > 0) put("installed_apps", installedApps)
             put("device", Build.MODEL)
         }
 
