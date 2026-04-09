@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val conversationHistory = JSONArray()
     private val client = OkHttpClient()
     private lateinit var actionHandler: ActionHandler
+    private var lastInteractionTime: Long = 0
 
     private val statusState       = mutableStateOf("SISTEMA ONLINE")
     private val lastResponseState = mutableStateOf("Pronto para o comando, Senhor Martim.")
@@ -152,17 +153,22 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             put("screen_content", NexAccessibilityService.lastScreenContent.take(500)) 
         }
 
+        // Reset Diário: Se passou mais de 24 horas, limpa o histórico
+        val currentTimeMillis = System.currentTimeMillis()
+        if (lastInteractionTime > 0 && (currentTimeMillis - lastInteractionTime > 86400000)) {
+            while (conversationHistory.length() > 0) { conversationHistory.remove(0) }
+        }
+        lastInteractionTime = currentTimeMillis
+
         conversationHistory.put(JSONObject().apply { put("role", "user"); put("content", userText) })
         
         // Mantém apenas as últimas 10 mensagens para não sobrecarregar o Gemini/Render
+        // Isso faz o "reset" automático para manter a fluidez
         if (conversationHistory.length() > 20) {
-            val newHistory = JSONArray()
-            for (i in (conversationHistory.length() - 10) until conversationHistory.length()) {
-                newHistory.put(conversationHistory.get(i))
+            val totalToRemove = conversationHistory.length() - 10
+            for (i in 0 until totalToRemove) {
+                conversationHistory.remove(0) 
             }
-            // Substituir o histórico pelo novo (mantendo o contexto recente)
-            // Nota: Em produção, o ideal seria reatribuir a variável, 
-            // mas como é val, limpamos e re-adicionamos se necessário ou apenas limitamos o envio.
         }
 
         val body = JSONObject().apply { 

@@ -51,7 +51,20 @@ $memoryFile = 'nex_memory.json';
 $memory = file_exists($memoryFile) ? json_decode(file_get_contents($memoryFile), true) : ['facts' => []];
 
 // ── CAPTURA DE INPUT ──
-$input = json_decode(file_get_contents('php://input'), true);
+$inputJSON = file_get_contents('php://input');
+$input = json_decode($inputJSON, true);
+
+// Se for um ping (UptimeRobot ou Navegador), responde OK imediatamente
+if (!$input || empty($input['messages'])) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'status' => 'online',
+        'system' => 'NEXA_CORE_V2',
+        'message' => 'Protocolo Jarvis ativo, Senhor Martim.'
+    ]);
+    exit;
+}
+
 $messages = $input['messages'] ?? [];
 $context = $input['context'] ?? [];
 
