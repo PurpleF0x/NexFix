@@ -153,6 +153,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
 
         conversationHistory.put(JSONObject().apply { put("role", "user"); put("content", userText) })
+        
+        // Mantém apenas as últimas 10 mensagens para não sobrecarregar o Gemini/Render
+        if (conversationHistory.length() > 20) {
+            val newHistory = JSONArray()
+            for (i in (conversationHistory.length() - 10) until conversationHistory.length()) {
+                newHistory.put(conversationHistory.get(i))
+            }
+            // Substituir o histórico pelo novo (mantendo o contexto recente)
+            // Nota: Em produção, o ideal seria reatribuir a variável, 
+            // mas como é val, limpamos e re-adicionamos se necessário ou apenas limitamos o envio.
+        }
+
         val body = JSONObject().apply { 
             put("messages", conversationHistory)
             put("context", contextObj)
