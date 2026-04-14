@@ -11,6 +11,12 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
+import android.provider.Settings
+import androidx.core.content.ContextCompat
+import android.view.*
+import android.graphics.PixelFormat
+import android.widget.ImageView
+import android.widget.FrameLayout
 import androidx.core.app.NotificationCompat
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -26,6 +32,9 @@ class NexService : Service(), TextToSpeech.OnInitListener {
     private lateinit var speechRecognizer: SpeechRecognizer
     private lateinit var tts: TextToSpeech
     private lateinit var actionHandler: ActionHandler
+    private lateinit var windowManager: WindowManager
+    private var floatingOrb: View? = null
+    
     private val client = OkHttpClient()
     private val conversationHistory = JSONArray()
     private val BACKEND_URL = "https://purple-uwq6.onrender.com/api.php"
@@ -66,8 +75,79 @@ class NexService : Service(), TextToSpeech.OnInitListener {
 
         actionHandler = ActionHandler(this)
         tts = TextToSpeech(this, this)
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         setupSpeechRecognizer()
         registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        
+        if (Settings.canDrawOverlays(this)) {
+            showFloatingOrb()
+        }
+    }
+
+    private fun showFloatingOrb() {
+        floatingOrb = FrameLayout(this).apply {
+            // Criar um pequeno orbe visual (pode ser substituído pela tua logo depois)
+            val orbView = View(context).apply {
+                layoutParams = FrameLayout.LayoutParams(120, 120)
+                background = ContextCompat.getDrawable(context, android.R.drawable.presence_online) // Provisório
+                alpha = 0.7f
+            }
+            addView(orbView)
+            
+            setOnTouchListener(object : View.OnTouchListener {
+                private var initialX = 0
+                private var initialY = 0
+                private var initialTouchX = 0f
+                private var initialTouchY = 0f
+
+                override fun onTouch(v: View, event: MotionEvent): Boolean {
+                    val params = v.layoutParams as WindowManager.LayoutParams
+                    when (event.action) {
+                        MotionEvent.ACTION_DOWN -> {
+                            initialX = params.x
+                            initialY = params.y
+                            initialTouchX = event.rawX
+                            initialTouchY = event.rawY
+                            return true
+                        }
+                        MotionEvent.ACTION_MOVE -> {
+                            params.x = initialX + (event.rawX - initialTouchX).toInt()
+                            params.y = initialY + (event.rawY - initialTouchY).toInt()
+                            windowManager.updateViewLayout(floatingOrb, params)
+                            return true
+                        }
+                        MotionEvent.ACTION_UP -> {
+                            // Se for um toque rápido, abre a interface principal
+                            if (Math.abs(event.rawX - initialTouchX) < 10 && Math.abs(event.rawY - initialTouchY) < 10) {
+                                val intent = Intent(this@NexService, MainActivity::class.java).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(intent)
+                            }
+                            return true
+                        }
+                    }
+                    return false
+                }
+            })
+        }
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) 
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY 
+            else 
+                WindowManager.LayoutParams.TYPE_PHONE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 100
+        }
+
+        windowManager.addView(floatingOrb, params)
     }
 
     private fun setupSpeechRecognizer() {

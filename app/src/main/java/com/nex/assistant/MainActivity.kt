@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.hardware.camera2.CameraManager
 import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
@@ -20,19 +19,19 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -40,10 +39,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.border
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +58,7 @@ import java.util.Date
 import java.util.Locale
 
 val UniverseDeep    = Color(0xFF020617)
-val UniversePurple  = Color(0xFF1E1B4B) // Azul Noite Profundo
+val UniversePurple  = Color(0xFF1E1B4B)
 val NexPurpleLight  = Color(0xFFA78BFA)
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
@@ -74,9 +71,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private lateinit var actionHandler: ActionHandler
     private var lastInteractionTime: Long = 0
 
-    private val statusState       = mutableStateOf("SISTEMA ONLINE")
-    private val lastResponseState = mutableStateOf("Pronto para o comando, Senhor Martim.")
+    private val statusState       = mutableStateOf("PROTOCOLO EVA ATIVO")
+    private val lastResponseState = mutableStateOf("Mainframe operacional. Aguardando diretrizes, Senhor.")
     private val isListeningState  = mutableStateOf(false)
+    private val textInputState    = mutableStateOf("")
+    private val showSplash        = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +87,56 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
         setContent {
             NexTheme {
-                UniverseUI()
+                if (showSplash.value) {
+                    EvaSplashScreen(onFinish = { showSplash.value = false })
+                } else {
+                    UniverseUI()
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun EvaSplashScreen(onFinish: () -> Unit) {
+        val animationProgress = remember { Animatable(0f) }
+        LaunchedEffect(Unit) {
+            animationProgress.animateTo(1f, tween(3500, easing = LinearOutSlowInEasing))
+            kotlinx.coroutines.delay(500)
+            onFinish()
+        }
+
+        Box(modifier = Modifier.fillMaxSize().background(UniverseDeep), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.size(280.dp), contentAlignment = Alignment.Center) {
+                    // Animação das linhas (Circuito/Árvore)
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val p = animationProgress.value
+                        if (p > 0.1f) {
+                            val tp = ((p - 0.1f) / 0.3f).coerceIn(0f, 1f)
+                            drawLine(NexPurpleLight, androidx.compose.ui.geometry.Offset(size.width/2, size.height*0.8f), androidx.compose.ui.geometry.Offset(size.width/2, size.height*(0.8f - 0.4f * tp)), 6f)
+                        }
+                    }
+                    
+                    // O teu logo nex_logo.png aparece com fade-in
+                    if (animationProgress.value > 0.4f) {
+                        val logoAlpha = ((animationProgress.value - 0.4f) / 0.6f).coerceIn(0f, 1f)
+                        Image(
+                            painter = painterResource(id = R.drawable.nex_logo),
+                            contentDescription = "Nex Logo",
+                            modifier = Modifier.size(180.dp).alpha(logoAlpha).scale(0.8f + (0.2f * logoAlpha))
+                        )
+                    }
+
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawCircle(NexPurpleLight.copy(alpha = animationProgress.value * 0.1f), style = Stroke(1f), radius = (size.width/2) * animationProgress.value)
+                    }
+                }
+                
+                if (animationProgress.value > 0.7f) {
+                    val alpha = ((animationProgress.value - 0.7f) / 0.3f).coerceIn(0f, 1f)
+                    Text("NexFix OS", color = Color.White.copy(alpha = alpha), fontSize = 24.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 10.sp)
+                    Text("SYSTEM ONLINE", color = NexPurpleLight.copy(alpha = alpha * 0.6f), fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                }
             }
         }
     }
@@ -105,15 +153,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 statusState.value = when(error) {
                     SpeechRecognizer.ERROR_NO_MATCH -> "NÃO OUVI"
                     SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "SILÊNCIO..."
-                    SpeechRecognizer.ERROR_NETWORK -> "ERRO CONEXÃO"
                     else -> "REPETIR COMANDO"
                 }
                 isListeningState.value = false 
             }
-            override fun onReadyForSpeech(params: Bundle?) { 
-                statusState.value = "A OUVIR..."
-                isListeningState.value = true 
-            }
+            override fun onReadyForSpeech(params: Bundle?) { statusState.value = "A OUVIR..."; isListeningState.value = true }
             override fun onEndOfSpeech() { isListeningState.value = false }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
@@ -125,21 +169,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         tts.stop()
-        isListeningState.value = true
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toString())
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Como posso ajudar?")
-            // Melhora a sensibilidade e tempo de espera
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 2000L)
-            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_MINIMUM_LENGTH_MILLIS, 1500L)
         }
-        try {
-            speechRecognizer.startListening(intent)
-        } catch (e: Exception) {
-            statusState.value = "ERRO MIC"
-        }
+        try { speechRecognizer.startListening(intent) } catch (e: Exception) { statusState.value = "ERRO MIC" }
     }
 
     private fun sendToBackend(userText: String) {
@@ -153,7 +187,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             put("screen_content", NexAccessibilityService.lastScreenContent.take(500)) 
         }
 
-        // Reset Diário: Se passou mais de 24 horas, limpa o histórico
         val currentTimeMillis = System.currentTimeMillis()
         if (lastInteractionTime > 0 && (currentTimeMillis - lastInteractionTime > 86400000)) {
             while (conversationHistory.length() > 0) { conversationHistory.remove(0) }
@@ -161,16 +194,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         lastInteractionTime = currentTimeMillis
 
         conversationHistory.put(JSONObject().apply { put("role", "user"); put("content", userText) })
-        
-        // Mantém apenas as últimas 10 mensagens para não sobrecarregar o Gemini/Render
-        // Isso faz o "reset" automático para manter a fluidez
-        if (conversationHistory.length() > 20) {
-            val totalToRemove = conversationHistory.length() - 10
-            for (i in 0 until totalToRemove) {
-                conversationHistory.remove(0) 
-            }
-        }
-
         val body = JSONObject().apply { 
             put("messages", conversationHistory)
             put("context", contextObj)
@@ -180,35 +203,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             override fun onFailure(call: Call, e: IOException) { runOnUiThread { statusState.value = "OFFLINE" } }
             override fun onResponse(call: Call, response: Response) {
                 val res = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    runOnUiThread { statusState.value = "ERRO SERVIDOR" }
-                    return
-                }
                 try {
                     val json = JSONObject(res)
-                    val responseText = json.optString("response", "Sem resposta do núcleo.")
+                    val responseText = json.optString("response", "Erro de comunicação.")
                     val action = json.optString("action", "")
-                    
                     runOnUiThread {
                         lastResponseState.value = responseText
                         statusState.value = "SISTEMA ONLINE"
                         conversationHistory.put(JSONObject().apply { put("role", "assistant"); put("content", responseText) })
-                        
-                        if (action.isNotEmpty()) {
-                            val metadata = mutableMapOf<String, String>()
-                            json.optJSONObject("metadata")?.let { meta ->
-                                meta.keys().forEach { key -> metadata[key] = meta.getString(key) }
-                            }
-                            actionHandler.execute(action, metadata)
-                        }
+                        if (action.isNotEmpty()) actionHandler.execute(action, mutableMapOf())
                         tts.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "res")
                     }
-                } catch (e: Exception) { 
-                    runOnUiThread { 
-                        statusState.value = "DADOS INVÁLIDOS"
-                        // Log para depuração se necessário: android.util.Log.e("NEX", "Res: $res")
-                    } 
-                }
+                } catch (e: Exception) { runOnUiThread { statusState.value = "DADOS INVÁLIDOS" } }
             }
         })
     }
@@ -217,22 +223,32 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     fun UniverseUI() {
         Box(modifier = Modifier.fillMaxSize().background(UniverseDeep)) {
             StarField()
-            Column(
-                modifier = Modifier.fillMaxSize().padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
+            Column(modifier = Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("NEXA_CORE V2.0", color = NexPurpleLight.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("EVA_CORE V3.0", color = NexPurpleLight.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     Text(statusState.value, color = NexPurpleLight, fontSize = 14.sp)
                 }
-
                 NexCoreOrb(isListening = isListeningState.value)
-
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(lastResponseState.value, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Light, modifier = Modifier.padding(bottom = 20.dp))
-                    IconButton(onClick = { if (isListeningState.value) speechRecognizer.stopListening() else startListening() }, modifier = Modifier.size(64.dp).background(NexPurpleLight.copy(alpha = 0.1f), CircleShape)) {
-                        Icon(Icons.Default.Mic, contentDescription = null, tint = NexPurpleLight)
+                    Text(lastResponseState.value, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(bottom = 12.dp))
+                    OutlinedTextField(
+                        value = textInputState.value,
+                        onValueChange = { textInputState.value = it },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).clip(RoundedCornerShape(16.dp)),
+                        placeholder = { Text("Comando manual...", color = Color.Gray) },
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NexPurpleLight, unfocusedBorderColor = NexPurpleLight.copy(alpha = 0.2f), focusedTextColor = Color.White, unfocusedTextColor = Color.White),
+                        trailingIcon = {
+                            if (textInputState.value.isNotEmpty()) {
+                                IconButton(onClick = { 
+                                    val t = textInputState.value
+                                    textInputState.value = ""
+                                    sendToBackend(t)
+                                }) { Icon(Icons.AutoMirrored.Filled.Send, null, tint = NexPurpleLight) }
+                            }
+                        }
+                    )
+                    IconButton(onClick = { if (isListeningState.value) speechRecognizer.stopListening() else startListening() }, modifier = Modifier.size(60.dp).background(NexPurpleLight.copy(alpha = 0.1f), CircleShape)) {
+                        Icon(Icons.Default.Mic, null, tint = NexPurpleLight, modifier = Modifier.size(30.dp))
                     }
                 }
             }
@@ -243,16 +259,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     fun StarField() {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val rng = java.util.Random()
-            repeat(80) {
-                drawCircle(
-                    color = Color.White,
-                    radius = (1..2).random().toFloat(),
-                    center = androidx.compose.ui.geometry.Offset(
-                        rng.nextInt(size.width.toInt()).toFloat(),
-                        rng.nextInt(size.height.toInt()).toFloat()
-                    ),
-                    alpha = 0.05f + rng.nextFloat() * (0.3f - 0.05f)
-                )
+            repeat(60) {
+                drawCircle(Color.White, (1..2).random().toFloat(), androidx.compose.ui.geometry.Offset(rng.nextInt(size.width.toInt()).toFloat(), rng.nextInt(size.height.toInt()).toFloat()), 0.15f)
             }
         }
     }
@@ -260,79 +268,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     @Composable
     fun NexCoreOrb(isListening: Boolean) {
         val infiniteTransition = rememberInfiniteTransition(label = "orb")
+        val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(20000, easing = LinearEasing)), label = "rot")
+        val scale by infiniteTransition.animateFloat(1f, if (isListening) 1.1f else 1.02f, infiniteRepeatable(tween(2000), RepeatMode.Reverse), label = "scale")
         
-        // Rotação do disco principal (mais lento e majestoso)
-        val rotationAccretion by infiniteTransition.animateFloat(
-            initialValue = 0f, targetValue = 360f,
-            animationSpec = infiniteRepeatable(animation = tween(25000, easing = LinearEasing)), label = "rotationAccretion"
-        )
-        
-        // Rotação inversa para a camada de poeira estelar
-        val rotationDust by infiniteTransition.animateFloat(
-            initialValue = 360f, targetValue = 0f,
-            animationSpec = infiniteRepeatable(animation = tween(40000, easing = LinearEasing)), label = "rotationDust"
-        )
-
-        // Pulsação orgânica
-        val scale by infiniteTransition.animateFloat(
-            initialValue = 1f, targetValue = if (isListening) 1.12f else 1.02f,
-            animationSpec = infiniteRepeatable(animation = tween(2000), repeatMode = RepeatMode.Reverse), label = "scale"
-        )
-        
-        val photonAlpha by infiniteTransition.animateFloat(
-            initialValue = 0.6f, targetValue = 1.0f,
-            animationSpec = infiniteRepeatable(animation = tween(1500), repeatMode = RepeatMode.Reverse), label = "photonAlpha"
-        )
-
         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(300.dp).scale(scale)) {
-            
-            // 1. Brilho de Fundo (Nebulosa/Glow Violeta)
-            Box(modifier = Modifier.size(280.dp).blur(70.dp).background(
-                Brush.radialGradient(listOf(NexPurpleLight.copy(alpha = 0.25f), Color.Transparent)), CircleShape)
-            )
-
-            // 2. Disco de Acreção (O "Swirl" de matéria)
-            Canvas(modifier = Modifier.size(240.dp).rotate(rotationAccretion).blur(2.dp)) {
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            NexPurpleLight.copy(alpha = 0.7f),
-                            UniversePurple,
-                            NexPurpleLight.copy(alpha = 0.3f),
-                            Color.Transparent
-                        )
-                    ),
-                    style = Stroke(width = 45f)
-                )
+            Box(modifier = Modifier.size(280.dp).blur(60.dp).background(Brush.radialGradient(listOf(NexPurpleLight.copy(alpha = 0.2f), Color.Transparent)), CircleShape))
+            Canvas(modifier = Modifier.size(220.dp).rotate(rotation).blur(2.dp)) {
+                drawCircle(Brush.sweepGradient(listOf(Color.Transparent, NexPurpleLight, UniversePurple, Color.Transparent)), style = Stroke(40f))
             }
-
-            // 2.1 Camada Interna (Poeira Estelar com rotação inversa)
-            Canvas(modifier = Modifier.size(190.dp).rotate(rotationDust).blur(1.dp)) {
-                drawCircle(
-                    brush = Brush.sweepGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.White.copy(alpha = 0.2f),
-                            NexPurpleLight.copy(alpha = 0.4f),
-                            Color.Transparent
-                        )
-                    ),
-                    style = Stroke(width = 10f)
-                )
-            }
-
-            // 3. Photon Ring (Anel de luz branca intensa na borda)
-            Box(modifier = Modifier.size(102.dp).border(2.dp, Color.White.copy(alpha = 0.8f * photonAlpha), CircleShape).blur(1.dp))
-            Box(modifier = Modifier.size(105.dp).border(5.dp, NexPurpleLight.copy(alpha = 0.4f), CircleShape).blur(4.dp))
-
-            // 4. O Horizonte de Eventos (O Buraco Negro)
             Box(modifier = Modifier.size(100.dp).background(Color.Black, CircleShape))
-            
-            // 5. Sombra interna para dar volume
-            Box(modifier = Modifier.size(100.dp).border(8.dp, 
-                Brush.radialGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))), CircleShape)
-            )
         }
     }
 
@@ -340,25 +284,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onDestroy() { super.onDestroy(); tts.shutdown(); speechRecognizer.destroy() }
 
     private fun checkPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.CALL_PHONE
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
-        val missingPermissions = permissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
-        }
-
-        if (missingPermissions.isNotEmpty()) {
-            ActivityCompat.requestPermissions(this, missingPermissions.toTypedArray(), 101)
-        }
-
+        val permissions = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION)
+        val missing = permissions.filter { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }
+        if (missing.isNotEmpty()) ActivityCompat.requestPermissions(this, missing.toTypedArray(), 101)
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
             startActivity(intent)
