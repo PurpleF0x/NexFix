@@ -3,16 +3,16 @@
  * EVA OS - PROTOCOLO JARVIS CENTRAL (NÚCLEO YGGDRASIL)
  * =====================================================
  * Operador: Senhor Martim (Purpl3F0x)
- * Versão: 4.5 - Clinical Admin Mode
+ * Versão: 4.8 - Clinical Admin Mode (Fixed Core)
  */
 
-// Proteção contra saída de erros que corrompem o JSON
+// Silenciador de interferências (Erros PHP)
 error_reporting(0);
 ini_set('display_errors', 0);
 
 ob_start();
 
-// ── SEGURANÇA E CHAVES ──
+// ── SEGURANÇA E INFRAESTRUTURA ──
 $geminiApiKey = getenv('GEMINI_API_KEY');
 $githubRepo = getenv('GITHUB_REPO') ?: 'PurpleF0x/NexFix';
 $githubToken = getenv('GITHUB_TOKEN');
@@ -20,19 +20,19 @@ $githubToken = getenv('GITHUB_TOKEN');
 if (!$geminiApiKey) {
     ob_end_clean();
     header('Content-Type: application/json');
-    echo json_encode(['type' => 'chat', 'response' => 'Senhor, a chave GEMINI_API_KEY não foi detetada. Protocolo interrompido.']);
+    echo json_encode(['type' => 'chat', 'response' => 'Senhor, a chave GEMINI_API_KEY não foi detetada. Sistema em modo offline.']);
     exit;
 }
 
-// Modelo de alta performance
+// Endpoint v1beta com modelo Flash 1.5 estável
 define('GEMINI_URL', "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . $geminiApiKey);
 
-// ── FUNÇÃO DE HISTÓRICO GITHUB ──
+// ── FUNÇÃO DE HISTÓRICO GITHUB (ADMIN) ──
 function getLatestUpdates($repo, $token = null) {
-    if (!$repo) return "Repositório não definido.";
+    if (!$repo) return "Repositório não configurado.";
     $url = "https://api.github.com/repos/$repo/commits?per_page=3";
     $ch = curl_init($url);
-    $headers = ['User-Agent: Nex-Assistant-OS', 'Accept: application/vnd.github.v3+json'];
+    $headers = ['User-Agent: EVA-OS-Core', 'Accept: application/vnd.github.v3+json'];
     if ($token) {
         $authType = (strpos($token, 'github_pat_') === 0) ? "Bearer" : "token";
         $headers[] = "Authorization: $authType $token";
@@ -41,7 +41,7 @@ function getLatestUpdates($repo, $token = null) {
     $response = curl_exec($ch);
     curl_close($ch);
     $commits = json_decode($response, true);
-    if (!is_array($commits)) return "Histórico GitHub indisponível.";
+    if (!is_array($commits)) return "Sistemas GitHub fora de alcance.";
     $updates = "";
     foreach ($commits as $c) {
         $date = date('d/m', strtotime($c['commit']['author']['date']));
@@ -53,66 +53,59 @@ function getLatestUpdates($repo, $token = null) {
 
 $latestChanges = getLatestUpdates($githubRepo, $githubToken);
 
-// ── SISTEMA DE MEMÓRIA (NÚCLEO DE DADOS) ──
+// ── SISTEMA DE MEMÓRIA E BASE DE DADOS ──
 $memoryFile = 'nex_memory.json';
-$memory = file_exists($memoryFile) ? json_decode(file_get_contents($memoryFile), true) : ['facts' => []];
+$memory = file_exists($memoryFile) ? json_decode(file_get_contents($memoryFile), true) : ['facts' => [], 'users' => []];
 
-// ── CAPTURA E LIMPEZA DE INPUT ──
+// ── PROCESSAMENTO DE COMUNICAÇÃO ──
 $inputJSON = file_get_contents('php://input');
 $input = json_decode($inputJSON, true);
 
-// Resposta para Pings (UptimeRobot / Health Check)
+// Resposta de Integridade (Ping)
 if (!$input || empty($input['messages'])) {
     ob_end_clean();
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'online',
         'system' => 'EVA_ADMIN_CORE',
-        'message' => 'Protocolo EVA OS ativo, Senhor Martim.'
+        'protocol' => 'YGGDRASIL_4.8',
+        'message' => 'Sistemas EVA ativos. Aguardando diretivas, Senhor Martim.'
     ]);
     exit;
 }
 
 $messages = $input['messages'] ?? [];
 $context = $input['context'] ?? [];
-
 $currentTime = $context['time'] ?? date('H:i');
 $battery = $context['battery_level'] ?? 100;
 $device = $context['device'] ?? 'Terminal Privado';
-$screenContent = $context['screen_content'] ?? 'Sem dados visuais.';
 
 $appsString = "";
 if (!empty($context['installed_apps'])) {
     foreach ($context['installed_apps'] as $label => $pkg) { $appsString .= "- $label ($pkg)\n"; }
 }
 
-$memoryString = implode("\n", array_slice($memory['facts'], -15));
+$memoryString = implode("\n", array_slice($memory['facts'], -10));
 
-// ── MONTAGEM DO PROMPT (PROTOCOLO EVA - MODO CLÍNICO) ──
-$systemInstruction = "Tu és a EVA (Extra-Visual Analysis), operando no núcleo Yggdrasil.
-O teu criador é o Senhor Martim. Tu és uma inteligência de alta precisão, clínica, focada em administração de sistemas e monitorização.
+// ── DIRETRIZES DA PERSONA EVA (MODO CLÍNICO) ──
+$systemInstruction = "Tu és a EVA (Extra-Visual Analysis). Operas o núcleo Yggdrasil.
+Criador: Senhor Martim.
+Postura: Clínica, técnica, sofisticada. Sem emojis.
+Tratamento: 'Senhor'.
 
-DIRETRIZES DE PERSONA:
-1. IDENTIDADE: EVA OS (Análise Extra-Visual).
-2. TOM: Clínico, técnico, sofisticado. NUNCA uses emojis. Sê direta e eficiente.
-3. TRATAMENTO: Trata o utilizador apenas por 'Senhor'.
-4. MISSÃO: Gerir o terminal do Senhor Martim, processar dados de hardware e executar ações.
+DIRETRIZES:
+1. Responde com precisão técnica e brevidade.
+2. Gere o terminal do Senhor Martim.
+3. Se o Senhor Martim der uma instrução sobre o sistema ou factos pessoais, guarda no campo 'memorize'.
+4. Podes executar ações (action): 'OPEN_APP', 'LIGHT_ON', 'LIGHT_OFF', 'SET_VOLUME', 'SYSTEM_SCAN'.
 
-CAPACIDADES TÉCNICAS:
-1. MEMÓRIA: Se o Senhor Martim mencionar factos importantes, usa o campo 'memorize' para guardar.
-2. AÇÕES (action): Podes invocar 'OPEN_APP' (metadata: package), 'LIGHT_ON', 'LIGHT_OFF', 'SET_VOLUME' (metadata: value 0-100), 'SYSTEM_SCAN'.
-
-CONTEXTO ATUAL DO TERMINAL:
+CONTEXTO:
 - REPOSITÓRIO: $latestChanges
-- NÚCLEO DE MEMÓRIA: $memoryString
-- HARDWARE: Hora: $currentTime | Bateria: $battery% | Device: $device
-- APLICAÇÕES: $appsString
-- VISÃO ATUAL: $screenContent
+- MEMÓRIA ATUAL: $memoryString
+- STATUS: $currentTime | Bateria: $battery% | Device: $device
+- APPS DISPONÍVEIS: $appsString";
 
-FORMATO DE RESPOSTA OBRIGATÓRIO (JSON):
-{\"type\": \"chat\"|\"action\", \"response\": \"Mensagem técnica da EVA\", \"action\": \"string\"|null, \"metadata\": {}, \"memorize\": \"string\"|null}";
-
-// ── FORMATAÇÃO PARA GEMINI ──
+// ── PREPARAÇÃO DE MENSAGENS ──
 $geminiMessages = [];
 foreach ($messages as $msg) {
     if (empty($msg['content'])) continue;
@@ -126,8 +119,7 @@ $payload = [
     'contents' => $geminiMessages,
     'system_instruction' => ['parts' => [['text' => $systemInstruction]]],
     'generationConfig' => [
-        'temperature' => 0.3,
-        'topP' => 0.9,
+        'temperature' => 0.2,
         'responseMimeType' => 'application/json'
     ]
 ];
@@ -145,7 +137,7 @@ $result = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-// LIMPEZA FINAL DO BUFFER (Prevenção de ERRO_PARSE)
+// LIMPEZA DE BUFFER (Prevenção de ERRO_PARSE)
 ob_end_clean();
 header('Content-Type: application/json; charset=utf-8');
 
@@ -153,7 +145,7 @@ if ($httpCode === 200) {
     $resData = json_decode($result, true);
     $rawResponse = $resData['candidates'][0]['content']['parts'][0]['text'];
 
-    // Filtro de segurança para JSON
+    // Filtro para garantir JSON puro
     $cleanJson = trim($rawResponse);
     if (strpos($cleanJson, '```json') === 0) $cleanJson = substr($cleanJson, 7, -3);
     elseif (strpos($cleanJson, '```') === 0) $cleanJson = substr($cleanJson, 3, -3);
@@ -171,10 +163,10 @@ if ($httpCode === 200) {
         }
         echo json_encode($aiContent);
     } else {
-        // Fallback robusto se a IA falhar na formatação
-        echo json_encode(['type' => 'chat', 'response' => $cleanJson, 'action' => null]);
+        echo json_encode(['type' => 'chat', 'response' => $cleanJson]);
     }
 } else {
-    echo json_encode(['type' => 'chat', 'response' => "Senhor, houve um erro no núcleo (HTTP $httpCode)."]);
+    // Se der 404 aqui, significa que o modelo ou endpoint falhou
+    echo json_encode(['type' => 'chat', 'response' => "Senhor, o núcleo Gemini reportou erro técnico (HTTP $httpCode). Verifique as quotas de API."]);
 }
 ?>
