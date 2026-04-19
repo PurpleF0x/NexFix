@@ -1,9 +1,16 @@
 package com.nex.assistant
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.BatteryManager
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -11,17 +18,18 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicNone
 import androidx.compose.material3.*
@@ -30,15 +38,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,6 +67,7 @@ import java.util.Locale
 
 val UniverseDeep    = Color(0xFF010208)
 val NexPurpleLight  = Color(0xFFA78BFA)
+val NexCyan         = Color(0xFF00F2FF)
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
@@ -68,147 +78,184 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val client = OkHttpClient()
     private lateinit var actionHandler: ActionHandler
 
-    private val statusState       = mutableStateOf("NEX OS: ADMIN_MODE")
-    private val lastResponseState = mutableStateOf("Sincronização completa. Aguardando comando, Senhor.")
+    private val statusState       = mutableStateOf("NEX_CORE: STANDBY")
+    private val lastResponseState = mutableStateOf("Sistemas prontos. Aguardando comando, Senhor.")
     private val isListeningState  = mutableStateOf(false)
-    private val showSplash        = mutableStateOf(true)
+    private val batteryState      = mutableStateOf("--%")
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         checkPermissions()
         actionHandler = ActionHandler(this)
+        updateBatteryInfo()
+        
         ContextCompat.startForegroundService(this, Intent(this, NexService::class.java))
         tts = TextToSpeech(this, this)
         setupSpeechRecognizer()
 
         setContent {
             NexTheme {
-                if (showSplash.value) {
-                    EvaSplashScreen(onFinish = { showSplash.value = false })
-                } else {
-                    UniverseUI()
-                }
+                UniverseUI()
             }
         }
     }
 
-    @Composable
-    fun EvaSplashScreen(onFinish: () -> Unit) {
-        val anim = remember { Animatable(0f) }
-        LaunchedEffect(Unit) {
-            anim.animateTo(1f, tween(3000, easing = LinearOutSlowInEasing))
-            kotlinx.coroutines.delay(800)
-            onFinish()
-        }
-
-        Box(modifier = Modifier.fillMaxSize().background(UniverseDeep), contentAlignment = Alignment.Center) {
-            val p = anim.value
-            
-            if (p > 0.1f) {
-                val logoAlpha = ((p - 0.1f) / 0.5f).coerceIn(0f, 1f)
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = null,
-                    modifier = Modifier.size(200.dp).alpha(logoAlpha).scale(0.85f + (0.15f * logoAlpha)),
-                    contentScale = ContentScale.Inside
-                )
-            }
-
-                    if (p > 0.6f) {
-                        val textAlpha = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f)
-                        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("NEX OS", color = Color.White.copy(alpha = textAlpha), fontSize = 32.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 12.sp)
-                            Text("ADMIN PROTOCOL v5.5", color = NexPurpleLight.copy(alpha = textAlpha * 0.6f), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
-                        }
-                    }
-        }
+    private fun updateBatteryInfo() {
+        val intent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val level = intent?.getIntExtra(BatteryManager.EXTRA_LEVEL, -1) ?: -1
+        batteryState.value = "$level%"
     }
 
     @Composable
     fun UniverseUI() {
+        var textInput by remember { mutableStateOf("") }
+        val interactionSource = remember { MutableInteractionSource() }
+        
         Box(modifier = Modifier.fillMaxSize().background(UniverseDeep)) {
             StarField()
             
-            Row(modifier = Modifier.fillMaxSize()) {
-                // Área de Conteúdo Principal (88%)
-                Column(
-                    modifier = Modifier.weight(0.88f).fillMaxHeight().padding(28.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.SpaceBetween
+            Column(
+                modifier = Modifier.fillMaxSize().padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                // HUD Superior Avançado
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text("MAIN_OS: NEX_ADMIN", color = NexPurpleLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text(statusState.value, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                    Column {
+                        Text("NEX_OS v5.5", color = NexPurpleLight, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                        Text(statusState.value, color = Color.White.copy(alpha = 0.4f), fontSize = 9.sp)
                     }
-
-                    NexCoreOrb(isListening = isListeningState.value)
-
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
-                        color = Color.White.copy(alpha = 0.04f),
-                        shape = RoundedCornerShape(16.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, NexPurpleLight.copy(alpha = 0.15f))
-                    ) {
-                        Text(lastResponseState.value, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(16.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("PWR: ${batteryState.value}", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp)
+                        Text("LINK: SECURE", color = NexCyan.copy(alpha = 0.5f), fontSize = 8.sp)
                     }
                 }
 
-                // Sidebar Vertical Direita (12%)
-                Column(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(72.dp)
-                        .background(Color(0xFF1A1A2E).copy(alpha = 0.9f))
-                        .padding(vertical = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(32.dp)
-                ) {
-                    IconButton(onClick = { /* App Drawer */ }) {
-                        Icon(Icons.Default.Apps, null, tint = Color.White)
+                // Orb Central com Ondas de Áudio
+                NexAdvancedOrb(
+                    isListening = isListeningState.value,
+                    onClick = { 
+                        vibrate(40)
+                        if (isListeningState.value) speechRecognizer.stopListening() else startListening() 
                     }
-                    IconButton(onClick = { 
-                        val intent = Intent(this@MainActivity, NexBrowserActivity::class.java)
-                        startActivity(intent)
-                    }) {
-                        Icon(Icons.Default.Language, null, tint = Color.White)
-                    }
-                    
-                    Spacer(modifier = Modifier.weight(1f))
+                )
 
-                    IconButton(
-                        onClick = { if (isListeningState.value) speechRecognizer.stopListening() else startListening() },
-                        modifier = Modifier
-                            .size(56.dp)
-                            .background(NexPurpleLight.copy(alpha = 0.1f), CircleShape)
-                            .border(1.dp, NexPurpleLight.copy(alpha = 0.3f), CircleShape)
-                    ) {
-                        Icon(
-                            if (isListeningState.value) Icons.Default.Mic else Icons.Default.MicNone,
-                            null,
-                            tint = if (isListeningState.value) Color.Cyan else NexPurpleLight,
-                            modifier = Modifier.size(28.dp)
+                // Bloco de Interação
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    // Resposta da IA
+                    Box(modifier = Modifier.heightIn(min = 60.dp, max = 200.dp).padding(bottom = 20.dp)) {
+                        Text(
+                            lastResponseState.value,
+                            color = Color.White,
+                            fontSize = 17.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.alpha(if(isListeningState.value) 0.4f else 1f),
+                            lineHeight = 24.sp
                         )
                     }
+
+                    // Console de Comando (Input + Mic)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .background(Color.White.copy(alpha = 0.04f), CircleShape)
+                            .padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { 
+                                vibrate(30)
+                                if (isListeningState.value) speechRecognizer.stopListening() else startListening() 
+                            },
+                            modifier = Modifier.size(42.dp).background(if(isListeningState.value) NexCyan.copy(alpha = 0.1f) else Color.Transparent, CircleShape)
+                        ) {
+                            Icon(
+                                if(isListeningState.value) Icons.Default.Mic else Icons.Default.MicNone, 
+                                null, 
+                                tint = if(isListeningState.value) NexCyan else NexPurpleLight
+                            )
+                        }
+
+                        Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp), contentAlignment = Alignment.CenterStart) {
+                            if (textInput.isEmpty()) {
+                                Text("Diretriz manual...", color = Color.White.copy(alpha = 0.2f), fontSize = 14.sp)
+                            }
+                            BasicTextField(
+                                value = textInput,
+                                onValueChange = { textInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                textStyle = TextStyle(color = Color.White, fontSize = 15.sp),
+                                cursorBrush = SolidColor(NexCyan),
+                                singleLine = true
+                            )
+                        }
+
+                        if (textInput.isNotEmpty()) {
+                            IconButton(
+                                onClick = { 
+                                    val t = textInput
+                                    textInput = ""
+                                    sendToBackend(t) 
+                                },
+                                modifier = Modifier.size(42.dp)
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.Send, null, tint = NexCyan)
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
                 }
             }
         }
     }
 
     @Composable
-    fun NexCoreOrb(isListening: Boolean) {
+    fun NexAdvancedOrb(isListening: Boolean, onClick: () -> Unit) {
         val infiniteTransition = rememberInfiniteTransition()
-        val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(25000, easing = LinearEasing)))
-        val pulse by infiniteTransition.animateFloat(1f, if (isListening) 1.12f else 1.05f, infiniteRepeatable(tween(2000), RepeatMode.Reverse))
+        
+        // Rotação do anel externo
+        val rotation by infiniteTransition.animateFloat(0f, 360f, infiniteRepeatable(tween(20000, easing = LinearEasing)))
+        
+        // Pulsação base
+        val baseScale by infiniteTransition.animateFloat(1f, 1.05f, infiniteRepeatable(tween(2500), RepeatMode.Reverse))
+        
+        // Ondas de Áudio (apenas quando ouve)
+        val waveAlpha by infiniteTransition.animateFloat(0.6f, 0f, infiniteRepeatable(tween(1500)))
+        val waveScale by infiniteTransition.animateFloat(1f, 1.8f, infiniteRepeatable(tween(1500)))
 
-        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(320.dp).scale(pulse)) {
-            Box(modifier = Modifier.size(270.dp).blur(80.dp).background(Brush.radialGradient(listOf(NexPurpleLight.copy(alpha = 0.25f), Color.Transparent)), CircleShape))
-            Canvas(modifier = Modifier.size(280.dp).rotate(rotation)) {
-                drawCircle(Brush.sweepGradient(listOf(Color.Transparent, NexPurpleLight, Color.Transparent)), style = Stroke(width = 30f))
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(320.dp)
+                .scale(baseScale)
+                .clickable(interactionSource = null, indication = null, onClick = onClick)
+        ) {
+            // Ondas de expansão (Radar effect)
+            if (isListening) {
+                Box(modifier = Modifier.size(240.dp).scale(waveScale).alpha(waveAlpha).background(NexCyan.copy(alpha = 0.2f), CircleShape))
+                Box(modifier = Modifier.size(240.dp).scale(waveScale * 0.7f).alpha(waveAlpha).background(NexCyan.copy(alpha = 0.1f), CircleShape))
             }
+
+            // Glow de fundo
+            Box(modifier = Modifier.size(260.dp).blur(80.dp).background(Brush.radialGradient(listOf((if(isListening) NexCyan else NexPurpleLight).copy(alpha = 0.2f), Color.Transparent)), CircleShape))
+            
+            // Anel de progresso / Rotação
+            Canvas(modifier = Modifier.size(280.dp).rotate(rotation)) {
+                drawCircle(
+                    Brush.sweepGradient(listOf(Color.Transparent, if(isListening) NexCyan else NexPurpleLight, Color.Transparent)),
+                    style = Stroke(width = if(isListening) 12f else 6f)
+                )
+            }
+
+            // Logo Central
             Image(
                 painter = painterResource(id = R.drawable.logo),
                 contentDescription = null,
-                modifier = Modifier.size(150.dp).alpha(if(isListening) 1f else 0.85f),
+                modifier = Modifier.size(140.dp).alpha(if(isListening) 1f else 0.7f),
                 contentScale = ContentScale.Inside
             )
         }
@@ -217,9 +264,9 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     @Composable
     fun StarField() {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val rng = java.util.Random(1337)
-            repeat(80) {
-                drawCircle(Color.White, radius = (1..3).random().toFloat(), center = Offset(rng.nextInt(size.width.toInt()).toFloat(), rng.nextInt(size.height.toInt()).toFloat()), alpha = rng.nextFloat() * 0.4f)
+            val rng = java.util.Random(42)
+            repeat(150) {
+                drawCircle(Color.White, radius = (1..2).random().toFloat(), center = Offset(rng.nextInt(size.width.toInt()).toFloat(), rng.nextInt(size.height.toInt()).toFloat()), alpha = rng.nextFloat() * 0.4f)
             }
         }
     }
@@ -231,9 +278,19 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull() ?: return
                 sendToBackend(text)
             }
-            override fun onError(error: Int) { isListeningState.value = false }
-            override fun onReadyForSpeech(params: Bundle?) { isListeningState.value = true }
-            override fun onEndOfSpeech() { isListeningState.value = false }
+            override fun onError(error: Int) { 
+                isListeningState.value = false 
+                statusState.value = "CORE_READY"
+            }
+            override fun onReadyForSpeech(params: Bundle?) { 
+                isListeningState.value = true 
+                statusState.value = "LISTENING..."
+                vibrate(20)
+            }
+            override fun onEndOfSpeech() { 
+                isListeningState.value = false 
+                statusState.value = "PROCESSING..."
+            }
             override fun onBeginningOfSpeech() {}
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
@@ -245,101 +302,76 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private fun startListening() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toString())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, "pt-PT")
         }
         speechRecognizer.startListening(intent)
     }
 
     private fun sendToBackend(userText: String) {
-        runOnUiThread { statusState.value = "ANALYZING..." }
+        statusState.value = "ANALYZING_CORE..."
+        updateBatteryInfo()
         
-        try {
-            // Adicionar mensagem do utilizador ao histórico
-            val userMsg = JSONObject().apply { 
-                put("role", "user")
-                put("content", userText)
-            }
-            conversationHistory.put(userMsg)
+        val userMsg = JSONObject().apply { put("role", "user"); put("content", userText) }
+        conversationHistory.put(userMsg)
 
-            // Criar o payload final com o histórico completo
-            val payload = JSONObject().apply {
-                put("messages", conversationHistory)
-                put("context", JSONObject().apply {
-                    put("time", SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
-                    put("battery_level", 100) // Placeholder
-                })
-            }
-
-            val body = payload.toString().toRequestBody("application/json".toMediaType())
-
-            client.newCall(Request.Builder().url(BACKEND_URL).post(body).build()).enqueue(object : Callback {
-                override fun onFailure(call: Call, e: IOException) { 
-                    runOnUiThread { 
-                        statusState.value = "OFFLINE"
-                        lastResponseState.value = "Senhor, perdi a conexão com o núcleo."
-                    }
-                }
-                override fun onResponse(call: Call, response: Response) {
-                    val rawRes = response.body?.string() ?: ""
-                    val code = response.code
-                    
-                    try {
-                        if (!response.isSuccessful) {
-                            runOnUiThread {
-                                lastResponseState.value = "Erro de Servidor (HTTP $code). Verifique o backend."
-                                statusState.value = "ERRO_HTTP"
-                            }
-                            return
-                        }
-
-                        val json = JSONObject(rawRes)
-                        val responseText = json.optString("response", "Erro: O servidor não enviou 'response'.")
-                        
-                        runOnUiThread {
-                            statusState.value = "EVA_ONLINE"
-                            lastResponseState.value = responseText
-                            
-                            val assistantMsg = JSONObject().apply { 
-                                put("role", "assistant")
-                                put("content", responseText)
-                            }
-                            conversationHistory.put(assistantMsg)
-                            
-                            if (conversationHistory.length() > 10) {
-                                val newHistory = JSONArray()
-                                for (i in (conversationHistory.length() - 10) until conversationHistory.length()) {
-                                    newHistory.put(conversationHistory.get(i))
-                                }
-                                conversationHistory = newHistory
-                            }
-
-                            tts.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "res")
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread { 
-                            lastResponseState.value = "Erro de Dados: Resposta Inválida. Verifique o console do PHP."
-                            statusState.value = "ERRO_PARSE"
-                            // Log detalhado para o Logcat se precisares
-                            android.util.Log.e("EVA_ERROR", "Raw response: $rawRes", e)
-                        }
-                    }
-                }
+        val body = JSONObject().apply {
+            put("messages", conversationHistory)
+            put("context", JSONObject().apply {
+                put("time", SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
+                put("battery", batteryState.value)
             })
-        } catch (e: Exception) {
-            runOnUiThread { lastResponseState.value = "Erro interno: ${e.message}" }
+        }.toString().toRequestBody("application/json".toMediaType())
+
+        client.newCall(Request.Builder().url(BACKEND_URL).post(body).build()).enqueue(object : Callback {
+            override fun onFailure(call: Call, _e: IOException) {
+                runOnUiThread {
+                    statusState.value = "CONNECTION_LOST"
+                    lastResponseState.value = "Erro de rede. Núcleo inacessível."
+                }
+            }
+            override fun onResponse(call: Call, response: Response) {
+                val resStr = response.body?.string() ?: ""
+                try {
+                    val json = JSONObject(resStr)
+                    val responseText = json.optString("response", "Sistemas estáveis.")
+                    
+                    runOnUiThread {
+                        statusState.value = "CORE_READY"
+                        lastResponseState.value = responseText
+                        conversationHistory.put(JSONObject().apply { put("role", "assistant"); put("content", responseText) })
+                        
+                        // Execução de Ações
+                        val action = json.optString("action", "")
+                        val metadata = json.optJSONObject("metadata")
+                        val metaMap = mutableMapOf<String, String>()
+                        metadata?.keys()?.forEach { metaMap[it] = metadata.getString(it) }
+                        actionHandler.execute(action, metaMap)
+
+                        tts.speak(responseText, TextToSpeech.QUEUE_FLUSH, null, "res")
+                    }
+                } catch (e: Exception) { runOnUiThread { statusState.value = "CORE_READY" } }
+            }
+        })
+    }
+
+    private fun vibrate(ms: Long) {
+        val vibrator = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+            val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            vibratorManager.defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
         }
+        vibrator.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
     }
 
     override fun onInit(status: Int) { if (status == TextToSpeech.SUCCESS) tts.language = Locale("pt", "PT") }
     override fun onDestroy() { super.onDestroy(); tts.shutdown(); speechRecognizer.destroy() }
 
     private fun checkPermissions() {
-        val permissions = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.ACCESS_FINE_LOCATION)
-        if (permissions.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
-            ActivityCompat.requestPermissions(this, permissions, 101)
-        }
-        if (!Settings.canDrawOverlays(this)) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri()))
+        val perms = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CALL_PHONE)
+        if (perms.any { ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED }) {
+            ActivityCompat.requestPermissions(this, perms, 101)
         }
     }
 }
