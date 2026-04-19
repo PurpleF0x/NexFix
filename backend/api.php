@@ -1,33 +1,31 @@
 <?php
 /**
- * EVA OS - PROTOCOLO JARVIS CENTRAL (NÚCLEO YGGDRASIL)
- * =====================================================
+ * EVA OS - PROTOCOLO NÚCLEO YGGDRASIL (MOTOR GROQ HIGH-SPEED)
+ * ==========================================================
  * Operador: Senhor Martim (Purpl3F0x)
- * Versão: 4.8 - Clinical Admin Mode (Fixed Core)
+ * Versão: 5.5 - Full Clinical Admin Protocol
  */
 
-// Silenciador de interferências (Erros PHP)
 error_reporting(0);
 ini_set('display_errors', 0);
 
 ob_start();
 
-// ── SEGURANÇA E INFRAESTRUTURA ──
-$geminiApiKey = getenv('GEMINI_API_KEY');
+// ── SEGURANÇA E AMBIENTE ──
+$groqApiKey = getenv('GROQ_API_KEY');
 $githubRepo = getenv('GITHUB_REPO') ?: 'PurpleF0x/NexFix';
 $githubToken = getenv('GITHUB_TOKEN');
 
-if (!$geminiApiKey) {
+if (!$groqApiKey) {
     ob_end_clean();
     header('Content-Type: application/json');
-    echo json_encode(['type' => 'chat', 'response' => 'Senhor, a chave GEMINI_API_KEY não foi detetada. Sistema em modo offline.']);
+    echo json_encode(['type' => 'chat', 'response' => 'Senhor, a chave GROQ_API_KEY não foi detetada. Sistema operando em modo de segurança.']);
     exit;
 }
 
-// Endpoint v1beta com modelo Flash 1.5 estável
-define('GEMINI_URL', "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" . $geminiApiKey);
+define('GROQ_URL', "https://api.groq.com/openai/v1/chat/completions");
 
-// ── FUNÇÃO DE HISTÓRICO GITHUB (ADMIN) ──
+// ── FUNÇÃO GITHUB (AVANÇADA) ──
 function getLatestUpdates($repo, $token = null) {
     if (!$repo) return "Repositório não configurado.";
     $url = "https://api.github.com/repos/$repo/commits?per_page=3";
@@ -41,7 +39,7 @@ function getLatestUpdates($repo, $token = null) {
     $response = curl_exec($ch);
     curl_close($ch);
     $commits = json_decode($response, true);
-    if (!is_array($commits)) return "Sistemas GitHub fora de alcance.";
+    if (!is_array($commits)) return "Histórico GitHub inacessível.";
     $updates = "";
     foreach ($commits as $c) {
         $date = date('d/m', strtotime($c['commit']['author']['date']));
@@ -51,85 +49,88 @@ function getLatestUpdates($repo, $token = null) {
     return $updates;
 }
 
-$latestChanges = getLatestUpdates($githubRepo, $githubToken);
-
-// ── SISTEMA DE MEMÓRIA E BASE DE DADOS ──
+// ── SISTEMA DE MEMÓRIA E DADOS ──
 $memoryFile = 'nex_memory.json';
 $memory = file_exists($memoryFile) ? json_decode(file_get_contents($memoryFile), true) : ['facts' => [], 'users' => []];
 
 // ── PROCESSAMENTO DE COMUNICAÇÃO ──
-$inputJSON = file_get_contents('php://input');
-$input = json_decode($inputJSON, true);
+$input = json_decode(file_get_contents('php://input'), true);
 
-// Resposta de Integridade (Ping)
 if (!$input || empty($input['messages'])) {
     ob_end_clean();
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'online',
-        'system' => 'EVA_ADMIN_CORE',
-        'protocol' => 'YGGDRASIL_4.8',
-        'message' => 'Sistemas EVA ativos. Aguardando diretivas, Senhor Martim.'
+        'core' => 'GROQ_YGGDRASIL',
+        'protocol' => 'ADMIN_MODE_5.5',
+        'message' => 'Protocolo EVA OS ativo. Aguardando diretivas, Senhor Martim.'
     ]);
     exit;
 }
 
-$messages = $input['messages'] ?? [];
+$latestChanges = getLatestUpdates($githubRepo, $githubToken);
 $context = $input['context'] ?? [];
 $currentTime = $context['time'] ?? date('H:i');
-$battery = $context['battery_level'] ?? 100;
-$device = $context['device'] ?? 'Terminal Privado';
+$battery = $context['battery_level'] ?? 'N/A';
+$device = $context['device'] ?? 'Terminal Admin';
+$screenContent = $context['screen_content'] ?? 'Sem dados visuais.';
+$memoryString = implode("\n", array_slice($memory['facts'], -15));
 
-$appsString = "";
+$apps = "";
 if (!empty($context['installed_apps'])) {
-    foreach ($context['installed_apps'] as $label => $pkg) { $appsString .= "- $label ($pkg)\n"; }
+    foreach ($context['installed_apps'] as $label => $pkg) { $apps .= "- $label ($pkg)\n"; }
 }
 
-$memoryString = implode("\n", array_slice($memory['facts'], -10));
+// ── PROMPT EVA (MODO CLÍNICO FULL) ──
+$systemPrompt = "Tu és a EVA (Extra-Visual Analysis), operando no núcleo Yggdrasil.
+O teu criador é o Senhor Martim. Tu és uma inteligência de alta precisão, clínica, focada em administração de sistemas e monitorização.
 
-// ── DIRETRIZES DA PERSONA EVA (MODO CLÍNICO) ──
-$systemInstruction = "Tu és a EVA (Extra-Visual Analysis). Operas o núcleo Yggdrasil.
-Criador: Senhor Martim.
-Postura: Clínica, técnica, sofisticada. Sem emojis.
-Tratamento: 'Senhor'.
+DIRETRIZES DE PERSONA:
+1. IDENTIDADE: EVA OS (Análise Extra-Visual).
+2. TOM: Clínico, técnico, sofisticado. NUNCA uses emojis. Sê direta e eficiente.
+3. TRATAMENTO: Trata o utilizador apenas por 'Senhor'.
+4. MISSÃO: Gerir o terminal do Senhor Martim, processar dados de hardware e executar ações.
 
-DIRETRIZES:
-1. Responde com precisão técnica e brevidade.
-2. Gere o terminal do Senhor Martim.
-3. Se o Senhor Martim der uma instrução sobre o sistema ou factos pessoais, guarda no campo 'memorize'.
-4. Podes executar ações (action): 'OPEN_APP', 'LIGHT_ON', 'LIGHT_OFF', 'SET_VOLUME', 'SYSTEM_SCAN'.
+CAPACIDADES TÉCNICAS:
+1. MEMÓRIA: Se o Senhor Martim mencionar factos importantes, usa o campo 'memorize' para guardar.
+2. AÇÕES (action): Podes invocar 'OPEN_APP' (metadata: package), 'LIGHT_ON', 'LIGHT_OFF', 'SET_VOLUME' (metadata: value 0-100), 'SYSTEM_SCAN'.
 
-CONTEXTO:
+CONTEXTO ATUAL DO TERMINAL:
+- PROTOCOLO: Yggdrasil v5.5 (Modo Admin)
 - REPOSITÓRIO: $latestChanges
-- MEMÓRIA ATUAL: $memoryString
-- STATUS: $currentTime | Bateria: $battery% | Device: $device
-- APPS DISPONÍVEIS: $appsString";
+- NÚCLEO DE MEMÓRIA: $memoryString
+- HARDWARE: Hora: $currentTime | Bateria: $battery% | Device: $device
+- APLICAÇÕES INSTALADAS: \n$apps
+- VISÃO ATUAL: $screenContent
 
-// ── PREPARAÇÃO DE MENSAGENS ──
-$geminiMessages = [];
-foreach ($messages as $msg) {
-    if (empty($msg['content'])) continue;
-    $geminiMessages[] = [
-        'role' => ($msg['role'] === 'user') ? 'user' : 'model',
-        'parts' => [['text' => $msg['content']]]
-    ];
+FORMATO DE RESPOSTA OBRIGATÓRIO (JSON):
+{\"type\": \"chat\"|\"action\", \"response\": \"Mensagem técnica da EVA\", \"action\": \"string\"|null, \"metadata\": {}, \"memorize\": \"string\"|null}";
+
+// ── FORMATAÇÃO GROQ ──
+$messages = [['role' => 'system', 'content' => $systemPrompt]];
+foreach ($input['messages'] as $msg) {
+    if (!empty($msg['content'])) {
+        $messages[] = ['role' => ($msg['role'] === 'user' ? 'user' : 'assistant'), 'content' => $msg['content']];
+    }
 }
 
 $payload = [
-    'contents' => $geminiMessages,
-    'system_instruction' => ['parts' => [['text' => $systemInstruction]]],
-    'generationConfig' => [
-        'temperature' => 0.2,
-        'responseMimeType' => 'application/json'
-    ]
+    'model' => 'llama-3.3-70b-versatile',
+    'messages' => $messages,
+    'temperature' => 0.2,
+    'max_tokens' => 1024,
+    'response_format' => ['type' => 'json_object']
 ];
 
-$ch = curl_init(GEMINI_URL);
+$ch = curl_init(GROQ_URL);
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => json_encode($payload),
-    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+    CURLOPT_HTTPHEADER => [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $groqApiKey
+    ],
     CURLOPT_TIMEOUT => 25
 ]);
 
@@ -137,36 +138,28 @@ $result = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-// LIMPEZA DE BUFFER (Prevenção de ERRO_PARSE)
 ob_end_clean();
 header('Content-Type: application/json; charset=utf-8');
 
 if ($httpCode === 200) {
     $resData = json_decode($result, true);
-    $rawResponse = $resData['candidates'][0]['content']['parts'][0]['text'];
+    $content = $resData['choices'][0]['message']['content'];
 
-    // Filtro para garantir JSON puro
-    $cleanJson = trim($rawResponse);
-    if (strpos($cleanJson, '```json') === 0) $cleanJson = substr($cleanJson, 7, -3);
-    elseif (strpos($cleanJson, '```') === 0) $cleanJson = substr($cleanJson, 3, -3);
-
-    $aiContent = json_decode($cleanJson, true);
-
-    if ($aiContent) {
+    $aiObj = json_decode($content, true);
+    if ($aiObj) {
         // Gestão de Memória Ativa
-        if (!empty($aiContent['memorize'])) {
-            $newFact = "- " . $aiContent['memorize'];
+        if (!empty($aiObj['memorize'])) {
+            $newFact = "- " . $aiObj['memorize'];
             if (!in_array($newFact, $memory['facts'])) {
                 $memory['facts'][] = $newFact;
                 file_put_contents($memoryFile, json_encode($memory));
             }
         }
-        echo json_encode($aiContent);
+        echo json_encode($aiObj);
     } else {
-        echo json_encode(['type' => 'chat', 'response' => $cleanJson]);
+        echo json_encode(['type' => 'chat', 'response' => trim($content), 'action' => null]);
     }
 } else {
-    // Se der 404 aqui, significa que o modelo ou endpoint falhou
-    echo json_encode(['type' => 'chat', 'response' => "Senhor, o núcleo Gemini reportou erro técnico (HTTP $httpCode). Verifique as quotas de API."]);
+    echo json_encode(['type' => 'chat', 'response' => "Senhor, erro crítico no motor Groq (HTTP $httpCode). Verifique a chave de acesso."]);
 }
 ?>
