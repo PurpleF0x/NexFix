@@ -1,9 +1,9 @@
 <?php
 /**
- * EVA OS - PROTOCOLO NÚCLEO YGGDRASIL (MOTOR GROQ HIGH-SPEED)
- * ==========================================================
+ * NEX OS - PROTOCOLO DE ASSISTENTE INTEGRADO (MOTOR GROQ)
+ * =======================================================
  * Operador: Senhor Martim (Purpl3F0x)
- * Versão: 5.5 - Full Clinical Admin Protocol
+ * Versão: 1.0 - Clinical Assistant Protocol
  */
 
 error_reporting(0);
@@ -25,12 +25,12 @@ if (!$groqApiKey) {
 
 define('GROQ_URL', "https://api.groq.com/openai/v1/chat/completions");
 
-// ── FUNÇÃO GITHUB (AVANÇADA) ──
+// ── FUNÇÃO GITHUB (MONITORIZAÇÃO DE CÓDIGO) ──
 function getLatestUpdates($repo, $token = null) {
     if (!$repo) return "Repositório não configurado.";
     $url = "https://api.github.com/repos/$repo/commits?per_page=3";
     $ch = curl_init($url);
-    $headers = ['User-Agent: EVA-OS-Core', 'Accept: application/vnd.github.v3+json'];
+    $headers = ['User-Agent: Nex-Assistant-Core', 'Accept: application/vnd.github.v3+json'];
     if ($token) {
         $authType = (strpos($token, 'github_pat_') === 0) ? "Bearer" : "token";
         $headers[] = "Authorization: $authType $token";
@@ -61,9 +61,9 @@ if (!$input || empty($input['messages'])) {
     header('Content-Type: application/json');
     echo json_encode([
         'status' => 'online',
-        'core' => 'GROQ_YGGDRASIL',
-        'protocol' => 'ADMIN_MODE_5.5',
-        'message' => 'Protocolo EVA OS ativo. Aguardando diretivas, Senhor Martim.'
+        'core' => 'GROQ_NEX_CORE',
+        'protocol' => 'ADMIN_MODE_1.0',
+        'message' => 'Assistente Nex ativo. Aguardando diretivas, Senhor Martim.'
     ]);
     exit;
 }
@@ -81,30 +81,29 @@ if (!empty($context['installed_apps'])) {
     foreach ($context['installed_apps'] as $label => $pkg) { $apps .= "- $label ($pkg)\n"; }
 }
 
-// ── PROMPT EVA (MODO CLÍNICO FULL) ──
-$systemPrompt = "Tu és a EVA (Extra-Visual Analysis), operando no núcleo Yggdrasil.
-O teu criador é o Senhor Martim. Tu és uma inteligência de alta precisão, clínica, focada em administração de sistemas e monitorização.
+// ── PROMPT DO ASSISTENTE (NEX) ──
+$systemPrompt = "Tu és o Nex, um assistente de inteligência técnica integrado ao Sistema Operativo.
+O teu criador é o Senhor Martim. És uma ferramenta de alta precisão, clínica e focada na gestão do terminal.
 
-DIRETRIZES DE PERSONA:
-1. IDENTIDADE: EVA OS (Análise Extra-Visual).
-2. TOM: Clínico, técnico, sofisticado. NUNCA uses emojis. Sê direta e eficiente.
+DIRETRIZES:
+1. IDENTIDADE: Nex (Assistente do SO).
+2. TOM: Clínico, técnico, sofisticado. Sem emojis. Sê direto.
 3. TRATAMENTO: Trata o utilizador apenas por 'Senhor'.
-4. MISSÃO: Gerir o terminal do Senhor Martim, processar dados de hardware e executar ações.
+4. MISSÃO: Auxiliar na gestão do terminal, monitorizar hardware e executar ações do sistema.
 
-CAPACIDADES TÉCNICAS:
-1. MEMÓRIA: Se o Senhor Martim mencionar factos importantes, usa o campo 'memorize' para guardar.
-2. AÇÕES (action): Podes invocar 'OPEN_APP' (metadata: package), 'LIGHT_ON', 'LIGHT_OFF', 'SET_VOLUME' (metadata: value 0-100), 'SYSTEM_SCAN'.
+CAPACIDADES:
+- MEMÓRIA: Guarda factos relevantes no campo 'memorize'.
+- AÇÕES (action): OPEN_APP (metadata: package), LIGHT_ON, LIGHT_OFF, SET_VOLUME (metadata: value 0-100), SYSTEM_SCAN.
 
-CONTEXTO ATUAL DO TERMINAL:
-- PROTOCOLO: Yggdrasil v5.5 (Modo Admin)
-- REPOSITÓRIO: $latestChanges
-- NÚCLEO DE MEMÓRIA: $memoryString
+CONTEXTO ATUAL:
+- CÓDIGO (GitHub): $latestChanges
+- MEMÓRIA LOCAL: $memoryString
 - HARDWARE: Hora: $currentTime | Bateria: $battery% | Device: $device
-- APLICAÇÕES INSTALADAS: \n$apps
-- VISÃO ATUAL: $screenContent
+- APPS NO SISTEMA: \n$apps
+- VISÃO DE ECRÃ: $screenContent
 
-FORMATO DE RESPOSTA OBRIGATÓRIO (JSON):
-{\"type\": \"chat\"|\"action\", \"response\": \"Mensagem técnica da EVA\", \"action\": \"string\"|null, \"metadata\": {}, \"memorize\": \"string\"|null}";
+FORMATO OBRIGATÓRIO (JSON):
+{\"type\": \"chat\"|\"action\", \"response\": \"Mensagem técnica\", \"action\": \"string\"|null, \"metadata\": {}, \"memorize\": \"string\"|null}";
 
 // ── FORMATAÇÃO GROQ ──
 $messages = [['role' => 'system', 'content' => $systemPrompt]];
@@ -147,7 +146,6 @@ if ($httpCode === 200) {
 
     $aiObj = json_decode($content, true);
     if ($aiObj) {
-        // Gestão de Memória Ativa
         if (!empty($aiObj['memorize'])) {
             $newFact = "- " . $aiObj['memorize'];
             if (!in_array($newFact, $memory['facts'])) {
@@ -160,6 +158,6 @@ if ($httpCode === 200) {
         echo json_encode(['type' => 'chat', 'response' => trim($content), 'action' => null]);
     }
 } else {
-    echo json_encode(['type' => 'chat', 'response' => "Senhor, erro crítico no motor Groq (HTTP $httpCode). Verifique a chave de acesso."]);
+    echo json_encode(['type' => 'chat', 'response' => "Senhor, erro de ligação ao núcleo Nex (HTTP $httpCode)."]);
 }
 ?>

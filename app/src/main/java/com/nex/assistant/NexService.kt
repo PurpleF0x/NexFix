@@ -41,6 +41,7 @@ class NexService : Service(), TextToSpeech.OnInitListener {
     private lateinit var actionHandler: ActionHandler
     private lateinit var windowManager: WindowManager
     private var floatingOrb: View? = null
+    private var orbLogo: ImageView? = null
     
     private val client = OkHttpClient()
     private val conversationHistory = JSONArray()
@@ -88,12 +89,12 @@ class NexService : Service(), TextToSpeech.OnInitListener {
     private fun showFloatingOrb() {
         val orbSize = 160
         floatingOrb = FrameLayout(this).apply {
-            val logoView = ImageView(context).apply {
+            orbLogo = ImageView(context).apply {
                 layoutParams = FrameLayout.LayoutParams(orbSize, orbSize)
                 setImageResource(R.drawable.logo)
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
             }
-            addView(logoView)
+            addView(orbLogo)
             
             setOnTouchListener(object : View.OnTouchListener {
                 private var initialX = 0
@@ -241,6 +242,10 @@ class NexService : Service(), TextToSpeech.OnInitListener {
             put("battery_level", level)
             if (installedApps.length() > 0) put("installed_apps", installedApps)
             put("device", Build.MODEL)
+            if (TabManager.currentUrl.isNotEmpty()) {
+                put("browser_url", TabManager.currentUrl)
+                put("browser_content", if (TabManager.currentTabText.length > 500) TabManager.currentTabText.substring(0, 500) else TabManager.currentTabText)
+            }
         }
 
         // Adicionar ao histórico e limitar para evitar 429
@@ -360,6 +365,62 @@ class NexService : Service(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun pulseOrb() {
+        orbLogo?.let { logo ->
+            logo.animate()
+                .scaleX(1.4f)
+                .scaleY(1.4f)
+                .setDuration(300)
+                .withEndAction {
+                    logo.animate()
+                        .scaleX(1.0f)
+                        .scaleY(1.0f)
+                        .setDuration(500)
+                        .start()
+                }.start()
+        }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "PROACTIVE_SYNC") {
+            performProactiveAnalysis()
+        }
+        return START_STICKY
+    }
+
+    private fun performProactiveAnalysis() {
+        if (TabManager.currentTabText.isBlank()) return
+
+        val contextObj = JSONObject().apply {
+            put("time", SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()))
+            put("browser_url", TabManager.currentUrl)
+            put("browser_content", if (TabManager.currentTabText.length > 1000) TabManager.currentTabText.substring(0, 1000) else TabManager.currentTabText)
+            put("type", "proactive_analysis")
+        }
+
+        val body = JSONObject().apply {
+            put("messages", JSONArray()) // Análise isolada
+            put("context", contextObj)
+        }.toString().toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder().url(BACKEND_URL).post(body).build()
+        client.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {}
+            override fun onResponse(call: Call, response: Response) {
+                val resStr = response.body?.string() ?: ""
+                try {
+                    val json = JSONObject(resStr)
+                    val responseText = json.optString("response")
+                    if (responseText.isNotEmpty() && responseText != "null") {
+                        handler.post {
+                            pulseOrb()
+                            speakHigh(responseText, TextToSpeech.QUEUE_ADD, "proactive")
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        })
+    }
+
     override fun onBind(intent: Intent?) = null
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 }

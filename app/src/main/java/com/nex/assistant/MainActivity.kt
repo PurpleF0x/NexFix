@@ -1,14 +1,9 @@
 package com.nex.assistant
 
 import android.Manifest
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.os.BatteryManager
 import android.os.Bundle
-import android.os.Build
 import android.provider.Settings
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -16,17 +11,19 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicNone
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,12 +33,10 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.border
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -49,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.nex.assistant.ui.theme.NexTheme
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -62,7 +58,6 @@ import java.util.Locale
 
 val UniverseDeep    = Color(0xFF010208)
 val NexPurpleLight  = Color(0xFFA78BFA)
-val EvaEyeGold      = Color(0xFFFFD700)
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
@@ -72,12 +67,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private var conversationHistory = JSONArray()
     private val client = OkHttpClient()
     private lateinit var actionHandler: ActionHandler
-    private var lastInteractionTime: Long = 0
 
-    private val statusState       = mutableStateOf("EVA OS: ADMIN_MODE")
+    private val statusState       = mutableStateOf("NEX OS: ADMIN_MODE")
     private val lastResponseState = mutableStateOf("Sincronização completa. Aguardando comando, Senhor.")
     private val isListeningState  = mutableStateOf(false)
-    private val textInputState    = mutableStateOf("")
     private val showSplash        = mutableStateOf(true)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -121,13 +114,13 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 )
             }
 
-            if (p > 0.6f) {
-                val textAlpha = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f)
-                Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("EVA OS", color = Color.White.copy(alpha = textAlpha), fontSize = 32.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 12.sp)
-                    Text("ADMIN PROTOCOL v3.5", color = NexPurpleLight.copy(alpha = textAlpha * 0.6f), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
-                }
-            }
+                    if (p > 0.6f) {
+                        val textAlpha = ((p - 0.6f) / 0.4f).coerceIn(0f, 1f)
+                        Column(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("NEX OS", color = Color.White.copy(alpha = textAlpha), fontSize = 32.sp, fontWeight = FontWeight.ExtraLight, letterSpacing = 12.sp)
+                            Text("ADMIN PROTOCOL v5.5", color = NexPurpleLight.copy(alpha = textAlpha * 0.6f), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 4.sp)
+                        }
+                    }
         }
     }
 
@@ -135,35 +128,66 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     fun UniverseUI() {
         Box(modifier = Modifier.fillMaxSize().background(UniverseDeep)) {
             StarField()
-            Column(modifier = Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("MAIN_OS: EVA_ADMIN", color = NexPurpleLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(statusState.value, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
-                }
-                NexCoreOrb(isListening = isListeningState.value)
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), color = Color.White.copy(alpha = 0.04f), shape = RoundedCornerShape(16.dp), border = androidx.compose.foundation.BorderStroke(1.dp, NexPurpleLight.copy(alpha = 0.15f))) {
+            
+            Row(modifier = Modifier.fillMaxSize()) {
+                // Área de Conteúdo Principal (88%)
+                Column(
+                    modifier = Modifier.weight(0.88f).fillMaxHeight().padding(28.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text("MAIN_OS: NEX_ADMIN", color = NexPurpleLight, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(statusState.value, color = Color.White.copy(alpha = 0.5f), fontSize = 10.sp)
+                    }
+
+                    NexCoreOrb(isListening = isListeningState.value)
+
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                        color = Color.White.copy(alpha = 0.04f),
+                        shape = RoundedCornerShape(16.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NexPurpleLight.copy(alpha = 0.15f))
+                    ) {
                         Text(lastResponseState.value, color = Color.White, fontSize = 16.sp, modifier = Modifier.padding(16.dp))
                     }
-                    OutlinedTextField(
-                        value = textInputState.value,
-                        onValueChange = { textInputState.value = it },
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)),
-                        placeholder = { Text("Introduzir diretriz manual...", color = Color.Gray) },
-                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = NexPurpleLight, unfocusedBorderColor = NexPurpleLight.copy(alpha = 0.2f), focusedTextColor = Color.White),
-                        trailingIcon = {
-                            if (textInputState.value.isNotEmpty()) {
-                                IconButton(onClick = { 
-                                    val t = textInputState.value
-                                    textInputState.value = ""
-                                    sendToBackend(t)
-                                }) { Icon(Icons.AutoMirrored.Filled.Send, null, tint = NexPurpleLight) }
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    IconButton(onClick = { if (isListeningState.value) speechRecognizer.stopListening() else startListening() }, modifier = Modifier.size(68.dp).background(NexPurpleLight.copy(alpha = 0.1f), CircleShape).border(1.dp, NexPurpleLight.copy(alpha = 0.3f), CircleShape)) {
-                        Icon(Icons.Default.Mic, null, tint = if(isListeningState.value) Color.Cyan else NexPurpleLight, modifier = Modifier.size(34.dp))
+                }
+
+                // Sidebar Vertical Direita (12%)
+                Column(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(72.dp)
+                        .background(Color(0xFF1A1A2E).copy(alpha = 0.9f))
+                        .padding(vertical = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(32.dp)
+                ) {
+                    IconButton(onClick = { /* App Drawer */ }) {
+                        Icon(Icons.Default.Apps, null, tint = Color.White)
+                    }
+                    IconButton(onClick = { 
+                        val intent = Intent(this@MainActivity, NexBrowserActivity::class.java)
+                        startActivity(intent)
+                    }) {
+                        Icon(Icons.Default.Language, null, tint = Color.White)
+                    }
+                    
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    IconButton(
+                        onClick = { if (isListeningState.value) speechRecognizer.stopListening() else startListening() },
+                        modifier = Modifier
+                            .size(56.dp)
+                            .background(NexPurpleLight.copy(alpha = 0.1f), CircleShape)
+                            .border(1.dp, NexPurpleLight.copy(alpha = 0.3f), CircleShape)
+                    ) {
+                        Icon(
+                            if (isListeningState.value) Icons.Default.Mic else Icons.Default.MicNone,
+                            null,
+                            tint = if (isListeningState.value) Color.Cyan else NexPurpleLight,
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
                 }
             }
@@ -315,7 +339,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             ActivityCompat.requestPermissions(this, permissions, 101)
         }
         if (!Settings.canDrawOverlays(this)) {
-            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:$packageName".toUri()))
         }
     }
 }
