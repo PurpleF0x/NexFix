@@ -1,6 +1,7 @@
 package com.nex.assistant
 
 import android.app.*
+import android.content.pm.ServiceInfo
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -17,6 +18,12 @@ import android.view.*
 import android.graphics.PixelFormat
 import android.widget.ImageView
 import android.widget.FrameLayout
+import androidx.cardview.widget.CardView
+import android.animation.ObjectAnimator
+import android.graphics.Color
+import android.graphics.Outline
+import android.view.ViewOutlineProvider
+import android.view.Gravity
 import androidx.core.app.NotificationCompat
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaType
@@ -61,14 +68,8 @@ class NexService : Service(), TextToSpeech.OnInitListener {
         super.onCreate()
         createNotificationChannel()
         
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
-        } else {
-            0
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(1, buildNotification(), type)
+        if (Build.VERSION.SDK_INT >= 29) {
+            startForeground(1, buildNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
         } else {
             startForeground(1, buildNotification())
         }
@@ -85,44 +86,49 @@ class NexService : Service(), TextToSpeech.OnInitListener {
     }
 
     private fun showFloatingOrb() {
+        val orbSize = 160
         floatingOrb = FrameLayout(this).apply {
-            // Criar um pequeno orbe visual (pode ser substituído pela tua logo depois)
-            val orbView = View(context).apply {
-                layoutParams = FrameLayout.LayoutParams(120, 120)
-                background = ContextCompat.getDrawable(context, android.R.drawable.presence_online) // Provisório
-                alpha = 0.7f
+            val logoView = ImageView(context).apply {
+                layoutParams = FrameLayout.LayoutParams(orbSize, orbSize)
+                setImageResource(R.drawable.logo)
+                scaleType = ImageView.ScaleType.CENTER_INSIDE
             }
-            addView(orbView)
+            addView(logoView)
             
             setOnTouchListener(object : View.OnTouchListener {
                 private var initialX = 0
                 private var initialY = 0
                 private var initialTouchX = 0f
                 private var initialTouchY = 0f
+                private var lastAction = 0
 
                 override fun onTouch(v: View, event: MotionEvent): Boolean {
-                    val params = v.layoutParams as WindowManager.LayoutParams
+                    val params = floatingOrb?.layoutParams as? WindowManager.LayoutParams ?: return false
                     when (event.action) {
                         MotionEvent.ACTION_DOWN -> {
                             initialX = params.x
                             initialY = params.y
                             initialTouchX = event.rawX
                             initialTouchY = event.rawY
+                            lastAction = MotionEvent.ACTION_DOWN
                             return true
                         }
                         MotionEvent.ACTION_MOVE -> {
                             params.x = initialX + (event.rawX - initialTouchX).toInt()
                             params.y = initialY + (event.rawY - initialTouchY).toInt()
                             windowManager.updateViewLayout(floatingOrb, params)
+                            lastAction = MotionEvent.ACTION_MOVE
                             return true
                         }
                         MotionEvent.ACTION_UP -> {
-                            // Se for um toque rápido, abre a interface principal
-                            if (Math.abs(event.rawX - initialTouchX) < 10 && Math.abs(event.rawY - initialTouchY) < 10) {
+                            // Se for um clique (pouco movimento)
+                            if (lastAction == MotionEvent.ACTION_DOWN || 
+                                (Math.abs(event.rawX - initialTouchX) < 15 && Math.abs(event.rawY - initialTouchY) < 15)) {
                                 val intent = Intent(this@NexService, MainActivity::class.java).apply {
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                                 }
                                 startActivity(intent)
+                                vibrate(50) // Feedback tátil Admin
                             }
                             return true
                         }
@@ -139,12 +145,12 @@ class NexService : Service(), TextToSpeech.OnInitListener {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY 
             else 
                 WindowManager.LayoutParams.TYPE_PHONE,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             x = 0
-            y = 100
+            y = 300 // Posição inicial mais acessível
         }
 
         windowManager.addView(floatingOrb, params)
