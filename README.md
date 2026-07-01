@@ -18,4 +18,4 @@ O **Nex** é um assistente proativo de nova geração, inspirado no protocolo JA
 - **Memória:** Persistência via JSON com lógica de deduplicação.
 
 ---
-*Este repositório é privado e confidencial. Propriedade de Martim (Purpl3F0x).*
+*Este projeto foi desenvolvido para fins de estudo e inovação em IA Mobile. Licenciado sob MIT. Criado por Martim (Purpl3F0x).*
